@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Poppins', sans-serif;
+    color: #2c2c2c;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  .section-title {
+    @apply font-serif text-4xl md:text-5xl text-center mb-4;
+  }
+
+  .section-subtitle {
+    @apply text-center text-gray-500 font-sans font-light mb-12 max-w-xl mx-auto leading-relaxed;
+  }
+
+  .gold-divider {
+    @apply w-16 h-0.5 bg-gold mx-auto mb-6;
+  }
+
+  .btn-gold {
+    @apply bg-gold text-white font-sans font-medium px-7 py-3 rounded-full
+           hover:bg-gold-dark transition-all duration-300 hover:shadow-lg
+           hover:-translate-y-0.5 active:translate-y-0 inline-block;
+  }
+
+  .btn-outline-gold {
+    @apply border-2 border-gold text-gold font-sans font-medium px-7 py-3 rounded-full
+           hover:bg-gold hover:text-white transition-all duration-300 inline-block;
+  }
+
+  .input-field {
+    @apply w-full border border-gray-200 rounded-xl px-3.5 py-2.5 font-sans text-sm
+           text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-gold/30
+           focus:border-gold transition-colors;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #FBF7F4; }
+::-webkit-scrollbar-thumb { background: #C9A84C; border-radius: 3px; }
+
+/* Lightbox overlay */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
