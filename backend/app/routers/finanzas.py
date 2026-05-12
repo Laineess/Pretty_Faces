@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, select as sa_select
 from datetime import datetime, date, timezone
@@ -15,6 +15,8 @@ from app.schemas.finanzas import (
     GastoCreate, GastoOut,
     DashboardOut,
 )
+from app.services.lealtad import registrar_visita
+from app.services.email_service import send_visit_email
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
@@ -69,6 +71,7 @@ def _serialize_pago(pago: Pago) -> dict:
 @router.post("/pagos", response_model=PagoOut, status_code=201)
 def registrar_pago(
     data: PagoCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _=Depends(get_current_user),
 ):
@@ -134,10 +137,51 @@ def registrar_pago(
     if cita:
         cita.estado = "completada"
 
+    # ── Lealtad: registrar visitas y recolectar info para email ───────────────
+    lealtad_info = []
+    if cliente:
+        # Determinar qué servicios se cobraron
+        servicios_cobrados: list[tuple[int, float]] = []
+        if data.servicios:
+            servicios_cobrados = [(s.servicio_id, s.precio_aplicado) for s in data.servicios]
+        elif cita:
+            servicios_cobrados = [(cs.servicio_id, cs.precio_aplicado) for cs in cita.servicios]
+
+        for servicio_id, precio in servicios_cobrados:
+            servicio = db.query(Servicio).filter(Servicio.id == servicio_id).first()
+            visita_n, descuento, next_expiry = registrar_visita(db, cliente.id, servicio_id)
+            if servicio:
+                lealtad_info.append({
+                    "servicio_nombre": servicio.nombre,
+                    "visita_n": visita_n,
+                    "descuento": descuento,
+                    "next_expiry": next_expiry,
+                    "dias_restantes": servicio.loyalty_expiry_dias,
+                    "visita_siguiente_numero": 1 if visita_n >= 7 else visita_n + 1,
+                    "proximo_hito": 5 if visita_n < 5 else (7 if visita_n < 7 else 5),
+                })
+
     db.commit()
 
+    # ── Email en background ───────────────────────────────────────────────────
     full_pago = _load_pago(pago.id, db)
-    return _serialize_pago(full_pago)
+    serialized = _serialize_pago(full_pago)
+
+    if cliente and cliente.email and lealtad_info:
+        background_tasks.add_task(
+            send_visit_email,
+            cliente_nombre=cliente.nombre,
+            cliente_email=cliente.email,
+            fecha_pago=serialized.fecha,
+            servicios_detalle=[{"nombre": s.nombre, "precio": s.precio} for s in serialized.servicios_detalle],
+            productos_detalle=[{"nombre": p.nombre, "precio": p.precio, "cantidad": p.cantidad} for p in serialized.productos_detalle],
+            monto_total=serialized.monto,
+            propina=serialized.propina,
+            metodo_pago=serialized.metodo_pago,
+            lealtad_info=lealtad_info,
+        )
+
+    return serialized
 
 
 @router.get("/pagos", response_model=list[PagoOut])

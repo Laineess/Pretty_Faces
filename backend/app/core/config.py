@@ -16,6 +16,12 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    MAIL_SERVER: str = "smtp.gmail.com"
+    MAIL_PORT: int = 587
+
     @property
     def database_url(self) -> str:
         return (

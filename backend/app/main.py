@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import auth, clientes, empleadas, citas, finanzas, servicios, productos, promociones
+from app.routers import auth, clientes, empleadas, citas, finanzas, servicios, productos, promociones, lealtad
 
 app = FastAPI(
     title="Pretty Face's Beauty Center — API",
@@ -26,6 +26,7 @@ app.include_router(finanzas.router)
 app.include_router(servicios.router)
 app.include_router(productos.router)
 app.include_router(promociones.router)
+app.include_router(lealtad.router)
 
 
 @app.get("/health")

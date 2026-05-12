@@ -15,3 +15,4 @@ class Cliente(Base):
     creado_en = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     citas = relationship("Cita", back_populates="cliente")
+    lealtad = relationship("ClienteLealtad", back_populates="cliente")

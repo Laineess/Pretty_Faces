@@ -16,5 +16,7 @@ class Servicio(Base):
         nullable=False,
     )
     activo = Column(Boolean, default=True)
+    loyalty_expiry_dias = Column(Integer, default=90, nullable=False)
 
     cita_servicios = relationship("CitaServicio", back_populates="servicio")
+    lealtad = relationship("ClienteLealtad", back_populates="servicio")
