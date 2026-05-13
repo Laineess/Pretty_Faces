@@ -3,17 +3,18 @@ from sqlalchemy.orm import Session
 from app.models.lealtad import ClienteLealtad
 from app.models.servicio import Servicio
 
-# Ciclo: 1-4 normal, 5 = 10%, 6 normal, 7 = 40%, luego reset a 1
-DESCUENTOS_CICLO = {5: 0.10, 7: 0.40}
+# Ciclo: 1-4 normal, 5=15%, 6 normal, 7=20%, 8-9 normal, 10=30%, luego reset a 1
+DESCUENTOS_CICLO = {5: 0.15, 7: 0.20, 10: 0.30}
+CICLO_MAX = 10
 
-# Expiry por defecto según categoría (días)
+# Expiry por categoría (días) — mín 90 (3 meses), máx 270 (9 meses)
 EXPIRY_POR_CATEGORIA = {
-    "depilacion": 60,
-    "cejas": 60,
-    "lash": 60,
-    "facial": 90,
-    "corporal": 120,
-    "capilar": 180,
+    "depilacion": 90,
+    "cejas": 90,
+    "lash": 90,
+    "facial": 120,
+    "corporal": 180,
+    "capilar": 270,
     "otro": 90,
 }
 
@@ -56,19 +57,22 @@ def obtener_estado_lealtad(db: Session, cliente_id: int, servicio_id: int) -> di
             dias_restantes = (expiry - now).days
 
     # Qué visita sería la próxima
-    next_n = 1 if visitas >= 7 else visitas + 1
+    next_n = 1 if visitas >= CICLO_MAX else visitas + 1
     descuento_siguiente = descuento_para_visita(next_n)
 
-    # Próximo hito (5 o 7)
+    # Próximo hito (5, 7 o 10)
     if visitas < 5:
         proximo_hito = 5
         visitas_para_hito = 5 - visitas
     elif visitas < 7:
         proximo_hito = 7
         visitas_para_hito = 7 - visitas
+    elif visitas < 10:
+        proximo_hito = 10
+        visitas_para_hito = 10 - visitas
     else:
-        proximo_hito = 5
-        visitas_para_hito = 5 - 1  # reset, necesita 4 más
+        proximo_hito = 5  # nuevo ciclo
+        visitas_para_hito = 4  # necesita 4 visitas para llegar al hito 5
 
     return {
         "servicio_id": servicio_id,
@@ -115,9 +119,9 @@ def registrar_visita(db: Session, cliente_id: int, servicio_id: int) -> tuple[in
         if now > expiry:
             lealtad.visitas_en_ciclo = 0  # caducó, resetea
 
-    # Incrementar con reset de ciclo en 7
+    # Incrementar con reset de ciclo en 10
     prev = lealtad.visitas_en_ciclo
-    new_count = 1 if prev >= 7 else prev + 1
+    new_count = 1 if prev >= CICLO_MAX else prev + 1
     lealtad.visitas_en_ciclo = new_count
     lealtad.ultima_visita = now
 

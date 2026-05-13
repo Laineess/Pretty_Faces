@@ -157,8 +157,8 @@ def registrar_pago(
                     "descuento": descuento,
                     "next_expiry": next_expiry,
                     "dias_restantes": servicio.loyalty_expiry_dias,
-                    "visita_siguiente_numero": 1 if visita_n >= 7 else visita_n + 1,
-                    "proximo_hito": 5 if visita_n < 5 else (7 if visita_n < 7 else 5),
+                    "visita_siguiente_numero": 1 if visita_n >= 10 else visita_n + 1,
+                    "proximo_hito": 5 if visita_n < 5 else (7 if visita_n < 7 else (10 if visita_n < 10 else 5)),
                 })
 
     db.commit()

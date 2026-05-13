@@ -94,38 +94,36 @@ def _build_loyalty_card(info: dict) -> str:
     descuento = info.get("descuento", 0.0)
     dias_restantes = info.get("dias_restantes")
 
-    # Construir 7 círculos
+    # Construir 10 círculos (hitos en 5=15%, 7=20%, 10=30%)
+    MILESTONE_STYLES = {
+        5:  ("#f59e0b", "#d97706", "15%"),
+        7:  ("#a855f7", "#7c3aed", "20%"),
+        10: ("#ec4899", "#be185d", "30%"),
+    }
     circles_html = ""
-    for i in range(1, 8):
+    for i in range(1, 11):
         filled = i <= visita_n
         is_current = i == visita_n
-        is_milestone_5 = i == 5
-        is_milestone_7 = i == 7
+        is_milestone = i in MILESTONE_STYLES
 
         if filled:
-            if is_milestone_5 and filled:
-                bg = "#a855f7"
-                border = "#7c3aed"
-            elif is_milestone_7 and filled:
-                bg = "#ec4899"
-                border = "#be185d"
+            if is_milestone:
+                bg, border, _ = MILESTONE_STYLES[i]
             else:
-                bg = "#6366f1"
-                border = "#4338ca"
-            emoji = "★" if (is_milestone_5 or is_milestone_7) else "✓"
+                bg, border = "#6366f1", "#4338ca"
+            emoji = "★" if is_milestone else "✓"
             text_color = "#ffffff"
         else:
-            bg = "#f3f4f6"
-            border = "#d1d5db"
+            bg, border = "#f3f4f6", "#d1d5db"
             emoji = str(i)
             text_color = "#9ca3af"
 
         pulse = "animation:pulse 1.5s infinite;" if is_current else ""
         circles_html += f"""
-        <div style="display:inline-block;width:36px;height:36px;line-height:36px;
+        <div style="display:inline-block;width:32px;height:32px;line-height:32px;
                     text-align:center;border-radius:50%;background:{bg};
                     border:2px solid {border};color:{text_color};
-                    font-size:12px;font-weight:bold;margin:3px;{pulse}">
+                    font-size:11px;font-weight:bold;margin:2px;{pulse}">
           {emoji}
         </div>"""
 
@@ -141,9 +139,11 @@ def _build_loyalty_card(info: dict) -> str:
     else:
         next_n = info.get("visita_siguiente_numero", visita_n + 1)
         if next_n == 5:
-            desc_badge = '<div style="font-size:12px;color:#6b7280;margin-top:4px;">Próxima visita: <b style="color:#a855f7;">10% de descuento ✨</b></div>'
+            desc_badge = '<div style="font-size:12px;color:#6b7280;margin-top:4px;">Próxima visita: <b style="color:#f59e0b;">15% de descuento ✨</b></div>'
         elif next_n == 7:
-            desc_badge = '<div style="font-size:12px;color:#6b7280;margin-top:4px;">Próxima visita: <b style="color:#ec4899;">40% de descuento 🎉</b></div>'
+            desc_badge = '<div style="font-size:12px;color:#6b7280;margin-top:4px;">Próxima visita: <b style="color:#a855f7;">20% de descuento 💜</b></div>'
+        elif next_n == 10:
+            desc_badge = '<div style="font-size:12px;color:#6b7280;margin-top:4px;">Próxima visita: <b style="color:#ec4899;">30% de descuento 🎉</b></div>'
         else:
             proximo_hito = info.get("proximo_hito", 5)
             faltante = proximo_hito - visita_n
@@ -179,7 +179,7 @@ def _build_loyalty_card(info: dict) -> str:
         {circles_html}
       </div>
       <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">
-        Visita <b>{visita_n}</b> de 7 en el ciclo actual
+        Visita <b>{visita_n}</b> de 10 en el ciclo actual
       </div>
       {desc_badge}
       {expiry_msg}
@@ -217,9 +217,10 @@ def _build_html(
           🏆 Tu Tarjeta de Lealtad
         </h2>
         <p style="font-size:13px;color:#6b7280;margin-bottom:16px;">
-          Visita 5 = <b style="color:#a855f7;">10% off</b> &nbsp;|&nbsp;
-          Visita 7 = <b style="color:#ec4899;">40% off</b>
-          &nbsp; por servicio · el ciclo se reinicia luego de la visita 7
+          Visita 5 = <b style="color:#f59e0b;">15% off</b> &nbsp;|&nbsp;
+          Visita 7 = <b style="color:#a855f7;">20% off</b> &nbsp;|&nbsp;
+          Visita 10 = <b style="color:#ec4899;">30% off</b>
+          &nbsp;· por servicio · ciclo reinicia luego de la visita 10
         </p>
         {loyalty_cards}
       </div>"""

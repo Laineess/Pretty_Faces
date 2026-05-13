@@ -21,15 +21,15 @@ def upgrade() -> None:
         sa.Column("loyalty_expiry_dias", sa.Integer(), nullable=False, server_default="90"),
     )
 
-    # Actualizar defaults por categoría
+    # Actualizar defaults por categoría (mín 90 días = 3 meses, máx 270 = 9 meses)
     op.execute("""
         UPDATE servicios SET loyalty_expiry_dias = CASE categoria
-            WHEN 'depilacion' THEN 60
-            WHEN 'cejas'      THEN 60
-            WHEN 'lash'       THEN 60
-            WHEN 'facial'     THEN 90
-            WHEN 'corporal'   THEN 120
-            WHEN 'capilar'    THEN 180
+            WHEN 'depilacion' THEN 90
+            WHEN 'cejas'      THEN 90
+            WHEN 'lash'       THEN 90
+            WHEN 'facial'     THEN 120
+            WHEN 'corporal'   THEN 180
+            WHEN 'capilar'    THEN 270
             ELSE 90
         END
     """)
