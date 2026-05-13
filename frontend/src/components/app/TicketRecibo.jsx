@@ -62,6 +62,7 @@ function buildWhatsAppText(pago) {
 export default function TicketRecibo({ pago, onClose }) {
   const ticketRef = useRef(null)
   const [emailStatus, setEmailStatus] = useState(null) // null | 'sending' | 'sent' | 'error' | 'no-email'
+  const [emailError, setEmailError] = useState(null)
 
   function handlePrint() {
     window.print()
@@ -75,14 +76,17 @@ export default function TicketRecibo({ pago, onClose }) {
   async function handleEmail() {
     if (emailStatus === 'sending') return
     setEmailStatus('sending')
+    setEmailError(null)
     try {
       await api.enviarEmailTicket(pago.id)
       setEmailStatus('sent')
     } catch (err) {
-      if (err.message?.includes('no tiene email')) {
+      const msg = err.message || 'Error desconocido'
+      if (msg.includes('no tiene email')) {
         setEmailStatus('no-email')
       } else {
         setEmailStatus('error')
+        setEmailError(msg)
       }
     }
   }
@@ -295,6 +299,11 @@ export default function TicketRecibo({ pago, onClose }) {
               </button>
             </div>
 
+            {emailError && (
+              <p className="text-xs text-red-500 mb-2 bg-red-50 rounded-lg px-3 py-2 leading-snug">
+                ⚠️ {emailError}
+              </p>
+            )}
             <button onClick={onClose} className="w-full btn-outline-gold text-sm py-2.5">
               Cerrar
             </button>

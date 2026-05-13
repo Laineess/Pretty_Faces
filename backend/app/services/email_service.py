@@ -9,6 +9,57 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _smtp_send(cliente_email: str, msg: MIMEMultipart) -> None:
+    """Realiza la conexión SMTP y envía. Lanza excepción si falla (no la swallow)."""
+    mail_user = (settings.MAIL_USERNAME or "").strip()
+    mail_pass = (settings.MAIL_PASSWORD or "").strip()
+
+    if not mail_user or not mail_pass:
+        raise ValueError(
+            "MAIL_USERNAME y MAIL_PASSWORD deben estar configurados en .env. "
+            "Gmail requiere una App Password (no la contraseña normal): "
+            "https://myaccount.google.com/apppasswords"
+        )
+
+    with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=15) as server:
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(mail_user, mail_pass)
+        server.sendmail(mail_user, [cliente_email], msg.as_string())
+
+    logger.info(f"Email enviado a {cliente_email}")
+
+
+def _build_message(
+    cliente_nombre: str,
+    cliente_email: str,
+    fecha_pago: datetime,
+    servicios_detalle: list[dict],
+    productos_detalle: list[dict],
+    monto_total: float,
+    propina: float,
+    metodo_pago: str,
+    lealtad_info: list[dict],
+) -> MIMEMultipart:
+    html = _build_html(
+        cliente_nombre=cliente_nombre,
+        fecha_pago=fecha_pago,
+        servicios_detalle=servicios_detalle,
+        productos_detalle=productos_detalle,
+        monto_total=monto_total,
+        propina=propina,
+        metodo_pago=metodo_pago,
+        lealtad_info=lealtad_info,
+    )
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"¡Gracias por tu visita, {cliente_nombre}! ✨ Pretty Face's Beauty Center"
+    msg["From"] = f"Pretty Face's Beauty Center <{(settings.MAIL_FROM or settings.MAIL_USERNAME or '').strip()}>"
+    msg["To"] = cliente_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    return msg
+
+
 def send_visit_email(
     cliente_nombre: str,
     cliente_email: str,
@@ -20,40 +71,36 @@ def send_visit_email(
     metodo_pago: str,
     lealtad_info: list[dict],
 ) -> None:
-    """Envía email de agradecimiento con ticket y tarjeta de lealtad."""
-    mail_user = (settings.MAIL_USERNAME or "").strip()
-    mail_pass = (settings.MAIL_PASSWORD or "").strip()
-    if not mail_user or not mail_pass:
-        logger.warning("MAIL_USERNAME / MAIL_PASSWORD no configurados — email omitido")
-        return
-
-    html = _build_html(
-        cliente_nombre=cliente_nombre,
-        fecha_pago=fecha_pago,
-        servicios_detalle=servicios_detalle,
-        productos_detalle=productos_detalle,
-        monto_total=monto_total,
-        propina=propina,
-        metodo_pago=metodo_pago,
-        lealtad_info=lealtad_info,
-    )
-
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"¡Gracias por tu visita, {cliente_nombre}! ✨ Pretty Face's Beauty Center"
-    msg["From"] = f"Pretty Face's Beauty Center <{settings.MAIL_FROM}>"
-    msg["To"] = cliente_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
+    """Para background tasks — errores se logean sin propagar."""
     try:
-        with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(mail_user, mail_pass)
-            server.sendmail(mail_user, [cliente_email], msg.as_string())
-        logger.info(f"Email enviado a {cliente_email}")
+        msg = _build_message(
+            cliente_nombre, cliente_email, fecha_pago,
+            servicios_detalle, productos_detalle,
+            monto_total, propina, metodo_pago, lealtad_info,
+        )
+        _smtp_send(cliente_email, msg)
     except Exception as e:
-        logger.error(f"Error enviando email a {cliente_email}: {e}")
+        logger.error(f"Email a {cliente_email} falló: {e}")
+
+
+def send_visit_email_sync(
+    cliente_nombre: str,
+    cliente_email: str,
+    fecha_pago: datetime,
+    servicios_detalle: list[dict],
+    productos_detalle: list[dict],
+    monto_total: float,
+    propina: float,
+    metodo_pago: str,
+    lealtad_info: list[dict],
+) -> None:
+    """Para llamadas síncronas — propaga la excepción al caller."""
+    msg = _build_message(
+        cliente_nombre, cliente_email, fecha_pago,
+        servicios_detalle, productos_detalle,
+        monto_total, propina, metodo_pago, lealtad_info,
+    )
+    _smtp_send(cliente_email, msg)
 
 
 # ── HTML builders ─────────────────────────────────────────────────────────────

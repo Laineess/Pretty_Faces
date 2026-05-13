@@ -16,7 +16,7 @@ from app.schemas.finanzas import (
     DashboardOut,
 )
 from app.services.lealtad import registrar_visita, obtener_estado_lealtad
-from app.services.email_service import send_visit_email
+from app.services.email_service import send_visit_email, send_visit_email_sync
 from app.models.lealtad import ClienteLealtad
 from datetime import timedelta
 
@@ -231,20 +231,24 @@ def enviar_email_ticket(
                 "proximo_hito": estado["proximo_hito"],
             })
 
-    background_tasks.add_task(
-        send_visit_email,
-        cliente_nombre=cliente.nombre,
-        cliente_email=cliente.email,
-        fecha_pago=serialized.fecha,
-        servicios_detalle=[{"nombre": s.nombre, "precio": s.precio} for s in serialized.servicios_detalle],
-        productos_detalle=[{"nombre": p.nombre, "precio": p.precio, "cantidad": p.cantidad} for p in serialized.productos_detalle],
-        monto_total=serialized.monto,
-        propina=serialized.propina,
-        metodo_pago=serialized.metodo_pago,
-        lealtad_info=lealtad_info,
-    )
+    try:
+        send_visit_email_sync(
+            cliente_nombre=cliente.nombre,
+            cliente_email=cliente.email,
+            fecha_pago=serialized.fecha,
+            servicios_detalle=[{"nombre": s.nombre, "precio": s.precio} for s in serialized.servicios_detalle],
+            productos_detalle=[{"nombre": p.nombre, "precio": p.precio, "cantidad": p.cantidad} for p in serialized.productos_detalle],
+            monto_total=serialized.monto,
+            propina=serialized.propina,
+            metodo_pago=serialized.metodo_pago,
+            lealtad_info=lealtad_info,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error SMTP: {e}")
 
-    return {"message": f"Email enviando a {cliente.email}"}
+    return {"message": f"Email enviado a {cliente.email}"}
 
 
 @router.get("/pagos", response_model=list[PagoOut])
@@ -463,3 +467,33 @@ def citas_sin_pago(
         }
         for c in citas
     ]
+
+
+@router.post("/test-email")
+def test_email(
+    destino: str = Query(..., description="Dirección de email de prueba"),
+    _=Depends(require_admin),
+):
+    """
+    Prueba la conexión SMTP y envía un email de prueba.
+    Retorna el error exacto si falla — útil para diagnosticar configuración.
+    Requiere: MAIL_USERNAME, MAIL_PASSWORD (App Password de Gmail) en .env
+    """
+    from app.services.email_service import send_visit_email_sync
+    from datetime import timezone
+
+    try:
+        send_visit_email_sync(
+            cliente_nombre="Test",
+            cliente_email=destino,
+            fecha_pago=datetime.now(timezone.utc),
+            servicios_detalle=[{"nombre": "Servicio de prueba", "precio": 100.0}],
+            productos_detalle=[],
+            monto_total=100.0,
+            propina=0.0,
+            metodo_pago="efectivo",
+            lealtad_info=[],
+        )
+        return {"ok": True, "message": f"Email de prueba enviado a {destino}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
