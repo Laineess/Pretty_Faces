@@ -118,6 +118,7 @@ export const api = {
     request('/finanzas/gastos', { method: 'POST', body: JSON.stringify(data) }),
   getGastos: (params = {}) => request('/finanzas/gastos?' + new URLSearchParams(params)),
   getCitasSinPago: () => request('/finanzas/citas-sin-pago'),
+  enviarEmailTicket: (id) => request(`/finanzas/pagos/${id}/enviar-email`, { method: 'POST' }),
   getCorteDeCaja: (fecha) => request(`/finanzas/corte-caja${fecha ? `?fecha=${fecha}` : ''}`),
   getReportes: (params = {}) => request('/finanzas/reportes?' + new URLSearchParams(params)),
 

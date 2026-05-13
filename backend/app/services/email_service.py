@@ -21,7 +21,9 @@ def send_visit_email(
     lealtad_info: list[dict],
 ) -> None:
     """Envía email de agradecimiento con ticket y tarjeta de lealtad."""
-    if not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD:
+    mail_user = (settings.MAIL_USERNAME or "").strip()
+    mail_pass = (settings.MAIL_PASSWORD or "").strip()
+    if not mail_user or not mail_pass:
         logger.warning("MAIL_USERNAME / MAIL_PASSWORD no configurados — email omitido")
         return
 
@@ -44,9 +46,11 @@ def send_visit_email(
 
     try:
         with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT, timeout=10) as server:
+            server.ehlo()
             server.starttls()
-            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-            server.sendmail(settings.MAIL_FROM, [cliente_email], msg.as_string())
+            server.ehlo()
+            server.login(mail_user, mail_pass)
+            server.sendmail(mail_user, [cliente_email], msg.as_string())
         logger.info(f"Email enviado a {cliente_email}")
     except Exception as e:
         logger.error(f"Error enviando email a {cliente_email}: {e}")

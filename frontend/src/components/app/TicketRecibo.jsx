@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import { api } from '../../lib/api'
 
 const NEGOCIO = {
   nombre: "Pretty Face's Beauty Center",
@@ -60,6 +61,7 @@ function buildWhatsAppText(pago) {
 
 export default function TicketRecibo({ pago, onClose }) {
   const ticketRef = useRef(null)
+  const [emailStatus, setEmailStatus] = useState(null) // null | 'sending' | 'sent' | 'error' | 'no-email'
 
   function handlePrint() {
     window.print()
@@ -70,10 +72,19 @@ export default function TicketRecibo({ pago, onClose }) {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   }
 
-  function handleEmail() {
-    const subject = encodeURIComponent(`Recibo - ${NEGOCIO.nombre}`)
-    const body = encodeURIComponent(buildWhatsAppText(pago).replace(/\*/g, ''))
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
+  async function handleEmail() {
+    if (emailStatus === 'sending') return
+    setEmailStatus('sending')
+    try {
+      await api.enviarEmailTicket(pago.id)
+      setEmailStatus('sent')
+    } catch (err) {
+      if (err.message?.includes('no tiene email')) {
+        setEmailStatus('no-email')
+      } else {
+        setEmailStatus('error')
+      }
+    }
   }
 
   const subtotal = pago.monto
@@ -245,12 +256,42 @@ export default function TicketRecibo({ pago, onClose }) {
 
               <button
                 onClick={handleEmail}
-                className="flex flex-col items-center gap-1 py-3 rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                disabled={emailStatus === 'sending'}
+                className={`flex flex-col items-center gap-1 py-3 rounded-xl border transition-colors
+                  ${emailStatus === 'sent'    ? 'border-green-400 bg-green-50' :
+                    emailStatus === 'error' || emailStatus === 'no-email' ? 'border-red-300 bg-red-50' :
+                    emailStatus === 'sending'  ? 'border-blue-300 bg-blue-50 opacity-60' :
+                    'border-gray-200 hover:border-blue-400 hover:bg-blue-50'}`}
               >
-                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                </svg>
-                <span className="font-sans text-xs text-gray-600">Email</span>
+                {emailStatus === 'sending' ? (
+                  <svg className="w-5 h-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                ) : emailStatus === 'sent' ? (
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : emailStatus === 'error' || emailStatus === 'no-email' ? (
+                  <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                )}
+                <span className={`font-sans text-xs
+                  ${emailStatus === 'sent' ? 'text-green-600' :
+                    emailStatus === 'error' ? 'text-red-500' :
+                    emailStatus === 'no-email' ? 'text-red-500' :
+                    'text-gray-600'}`}>
+                  {emailStatus === 'sending' ? 'Enviando…' :
+                   emailStatus === 'sent'    ? 'Enviado ✓' :
+                   emailStatus === 'error'   ? 'Error' :
+                   emailStatus === 'no-email'? 'Sin email' :
+                   'Email'}
+                </span>
               </button>
             </div>
 

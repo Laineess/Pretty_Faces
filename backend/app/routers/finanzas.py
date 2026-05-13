@@ -15,8 +15,10 @@ from app.schemas.finanzas import (
     GastoCreate, GastoOut,
     DashboardOut,
 )
-from app.services.lealtad import registrar_visita
+from app.services.lealtad import registrar_visita, obtener_estado_lealtad
 from app.services.email_service import send_visit_email
+from app.models.lealtad import ClienteLealtad
+from datetime import timedelta
 
 router = APIRouter(prefix="/finanzas", tags=["finanzas"])
 
@@ -167,7 +169,7 @@ def registrar_pago(
     full_pago = _load_pago(pago.id, db)
     serialized = _serialize_pago(full_pago)
 
-    if cliente and cliente.email and lealtad_info:
+    if cliente and cliente.email:
         background_tasks.add_task(
             send_visit_email,
             cliente_nombre=cliente.nombre,
@@ -182,6 +184,67 @@ def registrar_pago(
         )
 
     return serialized
+
+
+@router.post("/pagos/{pago_id}/enviar-email", status_code=200)
+def enviar_email_ticket(
+    pago_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """Reenvía el email del ticket al cliente. Usado desde el botón del ticket."""
+    full_pago = _load_pago(pago_id, db)
+    if not full_pago:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+
+    cliente = full_pago.cita.cliente if full_pago.cita else full_pago.cliente
+    if not cliente or not cliente.email:
+        raise HTTPException(status_code=400, detail="El cliente no tiene email registrado")
+
+    serialized = _serialize_pago(full_pago)
+
+    # Construir lealtad_info con estado actual (sin registrar nueva visita)
+    lealtad_info = []
+    now = datetime.now(timezone.utc)
+    for ps in full_pago.servicios:
+        srv = db.query(Servicio).filter(Servicio.id == ps.servicio_id).first()
+        estado = obtener_estado_lealtad(db, cliente.id, ps.servicio_id)
+        if estado and srv:
+            lealtad_rec = db.query(ClienteLealtad).filter(
+                ClienteLealtad.cliente_id == cliente.id,
+                ClienteLealtad.servicio_id == ps.servicio_id,
+            ).first()
+            next_expiry = None
+            if lealtad_rec and lealtad_rec.ultima_visita:
+                ultima = lealtad_rec.ultima_visita
+                if ultima.tzinfo is None:
+                    ultima = ultima.replace(tzinfo=timezone.utc)
+                next_expiry = ultima + timedelta(days=srv.loyalty_expiry_dias)
+            lealtad_info.append({
+                "servicio_nombre": estado["servicio_nombre"],
+                "visita_n": estado["visitas_en_ciclo"],
+                "descuento": 0.0,
+                "next_expiry": next_expiry,
+                "dias_restantes": estado["dias_para_expirar"],
+                "visita_siguiente_numero": estado["visita_siguiente_numero"],
+                "proximo_hito": estado["proximo_hito"],
+            })
+
+    background_tasks.add_task(
+        send_visit_email,
+        cliente_nombre=cliente.nombre,
+        cliente_email=cliente.email,
+        fecha_pago=serialized.fecha,
+        servicios_detalle=[{"nombre": s.nombre, "precio": s.precio} for s in serialized.servicios_detalle],
+        productos_detalle=[{"nombre": p.nombre, "precio": p.precio, "cantidad": p.cantidad} for p in serialized.productos_detalle],
+        monto_total=serialized.monto,
+        propina=serialized.propina,
+        metodo_pago=serialized.metodo_pago,
+        lealtad_info=lealtad_info,
+    )
+
+    return {"message": f"Email enviando a {cliente.email}"}
 
 
 @router.get("/pagos", response_model=list[PagoOut])
