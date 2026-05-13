@@ -1,5 +1,9 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
+
+# Siempre apunta a backend/.env independientemente del CWD
+_ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
 
 
 class Settings(BaseSettings):
@@ -35,7 +39,7 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",")]
 
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILE
         extra = "ignore"
 
 
