@@ -2,8 +2,11 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 import os
 
-# Siempre apunta a backend/.env independientemente del CWD
-_ENV_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+# config.py vive en backend/app/core/ → subir 3 niveles llega a backend/
+_ENV_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    ".env",
+)
 
 
 class Settings(BaseSettings):
